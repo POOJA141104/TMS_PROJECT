@@ -6,12 +6,27 @@ const cors = require("cors");
 
 const app = express();
 
+const allowedOrigins = process.env.CLIENT_URL
+  ? process.env.CLIENT_URL.split(",").map(url => url.trim())
+  : ["http://localhost:3000", "http://localhost"];
+
 app.use(cors({
-  origin: "http://localhost:3000",
+  origin: (origin, callback) => {
+    // allow requests with no origin (e.g. mobile apps, curl, server-to-server, reverse proxy)
+    if (!origin) return callback(null, true);
+    if (!process.env.CLIENT_URL || allowedOrigins.includes(origin) || allowedOrigins.includes("*")) {
+      return callback(null, true);
+    }
+    return callback(null, true);
+  },
   credentials: true
 }));
 
 app.use(express.json());
+
+// Health Check Endpoints
+app.get("/health", (req, res) => res.status(200).json({ status: "healthy", timestamp: new Date() }));
+app.get("/api/health", (req, res) => res.status(200).json({ status: "healthy", timestamp: new Date() }));
 
 // Routes
 app.use("/api/auth", require("./routes/auth"));
@@ -24,11 +39,17 @@ app.use("/api/rooms", require("./routes/rooms"));
 app.use("/api/roles", require("./routes/roles"));
 app.use("/api/reports", require("./routes/reports"));
 
-// MongoDB Connection
+// MongoDB Connection & Auto-Seed
+const autoSeed = require("./config/autoSeed");
+
 mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log("✅ MongoDB Connected"))
+  .then(async () => {
+    console.log("✅ MongoDB Connected");
+    await autoSeed();
+  })
   .catch(err => console.log("❌ MongoDB Error:", err));
 
-app.listen(5000, () => {
-  console.log("🚀 Backend running on port 5000");
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`🚀 Backend running on port ${PORT}`);
 });

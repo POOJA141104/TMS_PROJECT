@@ -1,0 +1,52 @@
+services:
+  mongo:
+    image: mongo:7.0
+    container_name: tms-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_DATABASE: ticketdb
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - tms-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: tms-backend
+    restart: unless-stopped
+    environment:
+      PORT: 5000
+      MONGO_URI: mongodb://mongo:27017/ticketdb
+      JWT_SECRET: ${JWT_SECRET:-tms_super_secret_jwt_key_aws_2026}
+      JWT_EXPIRE: 7d
+      NODE_ENV: production
+      CLIENT_URL: "*"
+    depends_on:
+      - mongo
+    networks:
+      - tms-network
+
+  frontend:
+    build:
+      context: ./frontend/myapp
+      dockerfile: Dockerfile
+      args:
+        REACT_APP_API_BASE_URL: /api
+    container_name: tms-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - tms-network
+
+volumes:
+  mongo-data:
+
+networks:
+  tms-network:
+    driver: bridge
+
